@@ -1,3 +1,4 @@
+use regex::Regex;
 use std::{
     fs,
     io::{prelude::*, BufReader},
@@ -21,21 +22,31 @@ fn main() {
 fn handle_connection(mut stream: TcpStream) {
     let buf_reader = BufReader::new(&mut stream);
 
-    let http_request: Vec<_> = buf_reader
-        .lines()
-        .map(|result| result.unwrap())
-        .take_while(|line| !line.is_empty())
-        .collect();
+    // let http_request: Vec<_> = buf_reader
+    //     .lines()
+    //     .map(|result| result.unwrap())
+    //     .take_while(|line| !line.is_empty())
+    //     .collect();
 
-    println!("Request: {:#?}", http_request);
+    let request_line = buf_reader.lines().next().unwrap().unwrap();
 
-    let file_name = "hello.html";
+    println!("Request: {:#?}", request_line);
 
-    let (status_line, contents) = match fs::read_to_string(format!("{WWWW_PATH}/{file_name}")) {
+    let request_line_regexp = Regex::new(
+        r#"(?P<method>GET|POST|PUT|PATCH|OPTIONS) /(?P<filename>.*) HTTP/(\d(?:\.\d)?)"#,
+    )
+    .unwrap();
+
+    let filename = match request_line_regexp.captures(&request_line) {
+        Some(x) => x.name("filename").unwrap().as_str(),
+        None => unreachable!(),
+    };
+
+    let (status_line, contents) = match fs::read_to_string(format!("{WWWW_PATH}/{filename}")) {
         Ok(file_content) => (HTTP_STATUS_200_OK, file_content),
         Err(error) => (
             HTTP_STATUS_404_NOT_FOUND,
-            format!("Cannot display file {file_name}: {error}"),
+            format!("Cannot display file {filename}: {error}"),
         ),
     };
     let length = contents.len();
