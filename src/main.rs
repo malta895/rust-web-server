@@ -8,6 +8,7 @@ use std::{
 const WWWW_PATH: &str = "./www";
 const HTTP_STATUS_200_OK: &str = "HTTP/1.1 200 OK";
 const HTTP_STATUS_404_NOT_FOUND: &str = "HTTP/1.1 404 NOT FOUND";
+const HTTP_STATUS_405_METHOD_NOT_ALLOWED: &str = "HTTP/1.1 405 METHOD NOT ALLOWED";
 
 fn main() {
     let listener = TcpListener::bind("127.0.0.1:7878").unwrap();
@@ -37,18 +38,29 @@ fn handle_connection(mut stream: TcpStream) {
     )
     .unwrap();
 
-    let filename = match request_line_regexp.captures(&request_line) {
-        Some(x) => x.name("filename").unwrap().as_str(),
+    let (http_method, filename) = match request_line_regexp.captures(&request_line) {
+        Some(x) => (
+            x.name("method").unwrap().as_str(),
+            x.name("filename").unwrap().as_str(),
+        ),
         None => unreachable!(),
     };
 
-    let (status_line, contents) = match fs::read_to_string(format!("{WWWW_PATH}/{filename}")) {
-        Ok(file_content) => (HTTP_STATUS_200_OK, file_content),
-        Err(error) => (
-            HTTP_STATUS_404_NOT_FOUND,
-            format!("Cannot display file {filename}: {error}"),
-        ),
+    let (status_line, contents) = if http_method == "GET" {
+        match fs::read_to_string(format!("{WWWW_PATH}/{filename}")) {
+            Ok(file_content) => (HTTP_STATUS_200_OK, file_content),
+            Err(error) => (
+                HTTP_STATUS_404_NOT_FOUND,
+                format!("Cannot display file {filename}: {error}"),
+            ),
+        }
+    } else {
+        (
+            HTTP_STATUS_405_METHOD_NOT_ALLOWED,
+            format!("Method {http_method} not allowed!"),
+        )
     };
+
     let length = contents.len();
 
     let response = format!("{status_line}\r\nContent-Lenght: {length}\r\n\r\n{contents}");
