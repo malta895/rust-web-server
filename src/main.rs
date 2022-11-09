@@ -11,7 +11,11 @@ const HTTP_STATUS_404_NOT_FOUND: &str = "HTTP/1.1 404 NOT FOUND";
 const HTTP_STATUS_405_METHOD_NOT_ALLOWED: &str = "HTTP/1.1 405 METHOD NOT ALLOWED";
 
 fn main() {
-    let listener = TcpListener::bind("127.0.0.1:7878").unwrap();
+    const HTTP_PORT: u32 = 7878;
+
+    let listener = TcpListener::bind(format!("127.0.0.1:{HTTP_PORT}")).unwrap();
+
+    println!("Server listening at localhost:{HTTP_PORT}");
 
     for stream in listener.incoming() {
         let stream = stream.unwrap();
@@ -38,12 +42,18 @@ fn handle_connection(mut stream: TcpStream) {
     )
     .unwrap();
 
-    let (http_method, filename) = match request_line_regexp.captures(&request_line) {
+    let (http_method, url_path) = match request_line_regexp.captures(&request_line) {
         Some(x) => (
             x.name("method").unwrap().as_str(),
             x.name("filename").unwrap().as_str(),
         ),
         None => unreachable!(),
+    };
+
+    let filename = if url_path == "" {
+        "index.html"
+    } else {
+        url_path
     };
 
     let (status_line, contents) = if http_method == "GET" {
