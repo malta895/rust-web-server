@@ -3,14 +3,19 @@ use std::{
     fs,
     io::{prelude::*, BufReader, Error},
     net::{TcpListener, TcpStream},
+    thread,
+    time::Duration,
 };
 
+use rust_web_server::ThreadPool;
 const WWWW_PATH: &str = "./www";
 const HTTP_STATUS_200_OK: (u32, &str) = (200, "HTTP/1.1 200 OK");
 const HTTP_STATUS_404_NOT_FOUND: (u32, &str) = (404, "HTTP/1.1 404 NOT FOUND");
 const HTTP_STATUS_405_METHOD_NOT_ALLOWED: (u32, &str) = (405, "HTTP/1.1 405 METHOD NOT ALLOWED");
 
-const HTTP_STATUS_403_FORBIDDEN: (u32, &str) = (403, "HTTP/1.1 403 FORBIDDEN");
+//const HTTP_STATUS_403_FORBIDDEN: (u32, &str) = (403, "HTTP/1.1 403 FORBIDDEN");
+
+const INDEX_FILENAME: &str = "index.html";
 
 fn main() {
     const HTTP_PORT: u32 = 7878;
@@ -25,10 +30,14 @@ fn main() {
 "#
     );
 
+    let pool = ThreadPool::new(100);
+
     for stream in listener.incoming() {
         let stream = stream.unwrap();
 
-        handle_connection(stream);
+        pool.execute(|| {
+            handle_connection(stream);
+        });
     }
 }
 
@@ -80,7 +89,10 @@ fn handle_connection(mut stream: TcpStream) {
     let (http_method, url_path) = parse_request_to_method_and_path(request_line);
 
     let filename = if url_path == "" {
-        "index.html"
+        INDEX_FILENAME
+    } else if url_path == "sleep" {
+        thread::sleep(Duration::from_secs(5));
+        INDEX_FILENAME
     } else {
         url_path.as_str()
     };
